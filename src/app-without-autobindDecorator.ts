@@ -1,35 +1,4 @@
-//autobind decorator....
-//avoid having the (this) losing the context or referenciating to the event in the addEventListener....
-function autobind(
-    _target: any, 
-    _methodName: string, 
-    descriptor: PropertyDescriptor
-)   {
-    const originalMethod = descriptor.value;
-    const adjDescriptor: PropertyDescriptor = {
-        configurable: true,
-        get(){
-            const boundFn = originalMethod.bind(this);//binds (this) to the method's descriptor value... 
-            return boundFn;
-        }
-    }
-    return adjDescriptor;
-}
-
-//global configuration for items dragEven handlers
-interface Draggable{
-    dragStartHandler(event: DragEvent): void;
-    dragEndHandler(event: DragEvent): void;
-}
-
-//global configuration for handlers on items-template interaction.
-interface DragTarget{
-    dragOverHandler(event: DragEvent):void;
-    dropHandler(event: DragEvent):void;
-    dragLeaveHandler(event: DragEvent):void;
-}
-
-
+/*
 //Global configuracion for the listeners functions
 type Listener<T> = (items: T[]) => void;
 
@@ -155,7 +124,7 @@ abstract class Component <T extends HTMLElement, U extends HTMLElement>{
 }
 
 //Project Item
-class ProjectItem extends Component<HTMLTemplateElement, HTMLLIElement> implements Draggable{
+class ProjectItem extends Component<HTMLTemplateElement, HTMLLIElement>{
 
     constructor (hostId: string, private prjItem: Project) {
         //calling super to render the li elem in the ul host.
@@ -169,29 +138,23 @@ class ProjectItem extends Component<HTMLTemplateElement, HTMLLIElement> implemen
         this.configureElemListeners();
     }
 
-
-    @autobind
-    dragStartHandler(e: DragEvent){
-        console.log('Drag Start!');         
-        //store the projectId in the DataTransfer. it will be used in the dragover and drop handlers in the ProjectList Class.
-        //set the effect allowse...
-        e.dataTransfer!.setData('text/plain', this.prjItem.id);
-        e.dataTransfer!.effectAllowed = 'move';
-    }
-
-    @autobind
-    dragEndHandler (e: DragEvent){
-        console.log('Drag End!');
-    }
-
     //methods to be implemented by subclases
     configureElemListeners(){
         //...Super Class Methods implementation...
 
         //set drag  event listeners
         //elem = li
-        this.elem.addEventListener('dragstart', this.dragStartHandler);
-        this.elem.addEventListener('dragend', this.dragEndHandler);
+        this.elem.addEventListener('dragstart', e => {  
+            console.log('Drag Start!');         
+            //store the projectId in the DataTransfer. it will be used in the dragover and drop handlers in the ProjectList Class.
+            //set the effect allowse...
+            e.dataTransfer!.setData('text/plain', this.prjItem.id);
+            e.dataTransfer!.effectAllowed = 'move';
+
+        })
+        this.elem.addEventListener('dragend', e => {
+            console.log('Drag End!');
+        })
 
     }
 
@@ -206,7 +169,7 @@ class ProjectItem extends Component<HTMLTemplateElement, HTMLLIElement> implemen
 
 
 //Project List
-class projectList extends Component<HTMLDivElement, HTMLElement> implements DragTarget{
+class projectList extends Component<HTMLDivElement, HTMLElement>{
     private assignedProjects: Project[] = [];
     constructor(public listType: 'active' | 'finished'){
         super(
@@ -219,55 +182,9 @@ class projectList extends Component<HTMLDivElement, HTMLElement> implements Drag
         this.configureElemListeners();
     }
 
-    @autobind
-    dragOverHandler(e: DragEvent){
-        //Add the droppable class to set the backgrounds in the droppable box.
-        if (e.dataTransfer && e.dataTransfer.types[0] === 'text/plain'){
-            e.preventDefault();
-            console.log('Drag Over!');
-            const ulList = this.elem.querySelector('ul')! as HTMLUListElement;
-            ulList.classList.add('droppable');
-        }
-    }
-
-    @autobind
-    dropHandler(e: DragEvent){
-        //remove the droppable class and set the logic to call the moveMethod and to the listeners to refresh the UI.
-        console.log('Drop!');
-
-        //get the project moved by it's id.
-        const prjId = e.dataTransfer!.getData('text/plain');
-        //call moveProject from the class ProjectSate and pass the prjId and the newProjStatus. moveProject will check if the status is a new one to then updated it and call the listeners.
-        prjState.moveProject(
-            prjId,
-            this.listType === 'active' ? ProjectStatus.Active : ProjectStatus.Finished
-        );
-
-        const ulList = this.elem.querySelector('ul')! as HTMLUListElement;
-        ulList.classList.remove('droppable');
-    }
-
-    @autobind
-    dragLeaveHandler(){
-        //remove the droppable class
-        console.log('Drag Leave');
-        const ulList = this.elem.querySelector('ul')! as HTMLUListElement;
-        ulList.classList.remove('droppable');
-    }
-
     //methods to be implemented by subclases
     configureElemListeners(){
         //...Super Class Methods implementation...
-
-
-        //drag event handlers
-        //elem = section
-        this.elem.addEventListener('dragover', this.dragOverHandler); //dragOver handler...
-
-        this.elem.addEventListener('drop', this.dropHandler); //drop handler...
-
-        this.elem.addEventListener('dragleave', this.dragLeaveHandler); //dragLeave handler...
-
 
         //Add listeners to the listenerFunctions Array
         prjState.addListener( (prjArray: Project[]) => {
@@ -281,7 +198,41 @@ class projectList extends Component<HTMLDivElement, HTMLElement> implements Drag
             this.assignedProjects =  relevantProjects;
             this.triggerProjectItemRendering();
         });
- 
+
+        //drag event handlers
+        //elem = section
+        this.elem.addEventListener('dragover', e => {
+            //Add the droppable class to set the backgrounds in the droppable box.
+            if (e.dataTransfer && e.dataTransfer.types[0] === 'text/plain'){
+                e.preventDefault();
+                console.log('Drag Over!');
+                const ulList = this.elem.querySelector('ul')! as HTMLUListElement;
+                ulList.classList.add('droppable');
+            }
+        });
+        this.elem.addEventListener('drop', e => {
+            //remove the droppable class and set the logic to call the moveMethod and to the listeners to refresh the UI.
+            console.log('Drop!');
+
+            //get the project moved by it's id.
+            const prjId = e.dataTransfer!.getData('text/plain');
+            //call moveProject from the class ProjectSate and pass the prjId and the newProjStatus. moveProject will check if the status is a new one to then updated it and call the listeners.
+            prjState.moveProject(
+                prjId,
+                this.listType === 'active' ? ProjectStatus.Active : ProjectStatus.Finished
+            );
+
+
+
+            const ulList = this.elem.querySelector('ul')! as HTMLUListElement;
+            ulList.classList.remove('droppable');
+        });
+        this.elem.addEventListener('dragleave', e => {
+            //remove the droppable class
+            console.log('Drag Leave');
+            const ulList = this.elem.querySelector('ul')! as HTMLUListElement;
+            ulList.classList.remove('droppable');
+        });
     }
 
     //render projects in the UI.
@@ -310,6 +261,9 @@ class projectList extends Component<HTMLDivElement, HTMLElement> implements Drag
         this.elem.querySelector('ul')!.id = listId;
     }
 }
+
+
+
 
 
 //interface that states the properties of the object to be validated by the validate function.
@@ -435,3 +389,4 @@ const prjInput = new ProjectInput();
 const prjState = new ProjectState();
 const activeList = new projectList('active');
 const finishedList = new projectList('finished');
+*/
